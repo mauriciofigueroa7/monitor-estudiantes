@@ -134,10 +134,26 @@ def main():
             col_tabla, col_grafico = st.columns([2, 1])
             
             with col_tabla:
-                st.subheader("Listado de Estudiantes")
+ 		st.subheader("Listado de Estudiantes")
+                
+                # Función para asignar colores basada en el TEXTO de la celda
+                def colorear_celdas(val):
+                    color = 'white' # Por defecto
+                    font_color = 'black'
+                    
+                    if val == 'MUY BAJA':
+                        color = '#FFCDD2' # Rojo claro
+                    elif val == 'BAJA':
+                        color = '#FFF9C4' # Amarillo claro
+                    elif val == 'NORMAL':
+                        color = '#C8E6C9' # Verde claro
+                        
+                    return f'background-color: {color}; color: {font_color}'
+
+                # Aplicamos el estilo usando la función correcta
                 st.dataframe(
                     df[['Nombre', 'Minutos', 'Estado', 'Icono']].style.applymap(
-                        lambda x: f'background-color: {x}', subset=['Estado']
+                        colorear_celdas, subset=['Estado']
                     ),
                     use_container_width=True
                 )
