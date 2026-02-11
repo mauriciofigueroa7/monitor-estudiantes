@@ -135,7 +135,6 @@ def main():
             
             with col_tabla:
  		st.subheader("Listado de Estudiantes")
-                
                 # Función para asignar colores basada en el TEXTO de la celda
                 def colorear_celdas(val):
                     color = 'white' # Por defecto
