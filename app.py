@@ -4,16 +4,12 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import plotly.express as px
-import plotly.graph_objects as go
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Monitor de Seguimiento", layout="wide", page_icon="📊")
 
-# --- FUNCIÓN: GENERAR HTML DEL CORREO (VISUAL) ---
+# --- 1. FUNCIÓN: GENERAR HTML DEL CORREO (VISUAL) ---
 def generar_html_correo(nombre, minutos, estado, color_estado, promedio_curso, min_curso, max_curso):
-    # Definir color del texto según fondo (simple)
-    text_color = "#5a5a5a"
-    
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -81,9 +77,8 @@ def generar_html_correo(nombre, minutos, estado, color_estado, promedio_curso, m
     """
     return html
 
-# --- FUNCIÓN: CLASIFICACIÓN DE DATOS ---
+# --- 2. FUNCIÓN: CLASIFICACIÓN DE DATOS ---
 def clasificar(minutos):
-    # Ajusta estos umbrales según tu criterio
     if minutos < 60:
         return "MUY BAJA", "#FFCDD2", "🔴" # Rojo
     elif minutos < 200:
@@ -91,21 +86,31 @@ def clasificar(minutos):
     else:
         return "NORMAL", "#C8E6C9", "🟢" # Verde
 
-# --- INTERFAZ PRINCIPAL ---
+# --- 3. FUNCIÓN: ESTILOS PARA LA TABLA (SOLUCIÓN DEL COLOR) ---
+def colorear_celdas(val):
+    color = 'white'
+    if val == 'MUY BAJA':
+        color = '#FFCDD2'
+    elif val == 'BAJA':
+        color = '#FFF9C4'
+    elif val == 'NORMAL':
+        color = '#C8E6C9'
+    return f'background-color: {color}; color: black'
+
+# --- 4. INTERFAZ PRINCIPAL ---
 def main():
     st.title("📊 Dashboard de Seguimiento Académico")
     st.markdown("Sube tu archivo Excel para analizar y enviar reportes.")
 
-    # 1. Carga de Archivo
+    # Carga de Archivo
     uploaded_file = st.file_uploader("Subir Excel (.xlsx)", type=['xlsx'])
 
     if uploaded_file:
-        # Leer datos
         try:
             df = pd.read_excel(uploaded_file)
             
             # Verificar columnas necesarias
-            req_cols = ['Nombre', 'Email', 'Minutos'] # Asegúrate que tu Excel tenga estas cabeceras
+            req_cols = ['Nombre', 'Email', 'Minutos'] 
             if not all(col in df.columns for col in req_cols):
                 st.error(f"El Excel debe tener las columnas: {req_cols}")
                 return
@@ -119,37 +124,21 @@ def main():
             maximo = df['Minutos'].max()
             total_min = df['Minutos'].sum()
 
-            # --- VISUALIZACIÓN TIPO DASHBOARD (Tu Captura) ---
-            
             # KPIs Superiores
             kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-            kpi1.metric("Mínimo", f"{minimo} min", delta_color="inverse")
+            kpi1.metric("Mínimo", f"{minimo} min")
             kpi2.metric("Máximo", f"{maximo} min")
             kpi3.metric("Promedio", f"{promedio:.1f} min")
             kpi4.metric("Total Grupo", f"{total_min} min")
 
             st.markdown("---")
 
-            # Tabla Detallada con Estilo
+            # --- TABLA Y GRÁFICOS ---
             col_tabla, col_grafico = st.columns([2, 1])
             
             with col_tabla:
- 		st.subheader("Listado de Estudiantes")
-                # Función para asignar colores basada en el TEXTO de la celda
-                def colorear_celdas(val):
-                    color = 'white' # Por defecto
-                    font_color = 'black'
-                    
-                    if val == 'MUY BAJA':
-                        color = '#FFCDD2' # Rojo claro
-                    elif val == 'BAJA':
-                        color = '#FFF9C4' # Amarillo claro
-                    elif val == 'NORMAL':
-                        color = '#C8E6C9' # Verde claro
-                        
-                    return f'background-color: {color}; color: {font_color}'
-
-                # Aplicamos el estilo usando la función correcta
+                st.subheader("Listado de Estudiantes")
+                # Aplicamos el estilo correctamente aquí
                 st.dataframe(
                     df[['Nombre', 'Minutos', 'Estado', 'Icono']].style.applymap(
                         colorear_celdas, subset=['Estado']
@@ -159,23 +148,24 @@ def main():
 
             with col_grafico:
                 st.subheader("Distribución")
-                fig = px.pie(df, names='Estado', hole=0.4, color='Estado',
+                fig = px.pie(df, names='Estado', hole=0.4, 
+                             color='Estado',
                              color_discrete_map={'MUY BAJA':'#FFCDD2', 'BAJA':'#FFF9C4', 'NORMAL':'#C8E6C9'})
                 st.plotly_chart(fig, use_container_width=True)
 
-            # --- SECCIÓN DE ENVÍO DE CORREOS ---
+            # --- ENVÍO DE CORREOS ---
             st.markdown("---")
             st.header("📧 Envío de Reportes")
             
             with st.expander("Ver Vista Previa del Correo (HTML)"):
-                ejemplo = df.iloc[0]
-                html_preview = generar_html_correo(ejemplo['Nombre'], ejemplo['Minutos'], 
-                                                 ejemplo['Estado'], ejemplo['Color_Hex'], 
-                                                 promedio, minimo, maximo)
-                st.components.v1.html(html_preview, height=500, scrolling=True)
+                if not df.empty:
+                    ejemplo = df.iloc[0]
+                    html_preview = generar_html_correo(ejemplo['Nombre'], ejemplo['Minutos'], 
+                                                     ejemplo['Estado'], ejemplo['Color_Hex'], 
+                                                     promedio, minimo, maximo)
+                    st.components.v1.html(html_preview, height=500, scrolling=True)
 
-            # Formulario para credenciales (O usar st.secrets en producción)
-            st.warning("Nota: Para enviar correos necesitas un 'App Password' de Gmail o tu servidor SMTP.")
+            st.warning("Nota: Usa una 'Contraseña de Aplicación' de Google, no tu clave normal.")
             
             col_email1, col_email2 = st.columns(2)
             remitente = col_email1.text_input("Tu Correo (Gmail)", "profesor@ejemplo.com")
@@ -189,29 +179,24 @@ def main():
                     status_text = st.empty()
                     
                     try:
-                        # Configurar Servidor SMTP (Ejemplo Gmail)
                         server = smtplib.SMTP('smtp.gmail.com', 587)
                         server.starttls()
                         server.login(remitente, password)
                         
                         for i, row in df.iterrows():
-                            # Crear Mensaje
                             msg = MIMEMultipart()
                             msg['From'] = remitente
                             msg['To'] = row['Email']
                             msg['Subject'] = f"📈 Reporte Semanal: {row['Nombre']}"
                             
-                            # Generar HTML personalizado
                             html_content = generar_html_correo(
                                 row['Nombre'], row['Minutos'], row['Estado'], row['Color_Hex'],
                                 promedio, minimo, maximo
                             )
                             msg.attach(MIMEText(html_content, 'html'))
                             
-                            # Enviar
                             server.send_message(msg)
                             
-                            # Actualizar barra
                             progreso = (i + 1) / len(df)
                             bar.progress(progreso)
                             status_text.text(f"Enviado a: {row['Nombre']}")
@@ -221,10 +206,10 @@ def main():
                         st.balloons()
                         
                     except Exception as e:
-                        st.error(f"Ocurrió un error al enviar: {e}")
+                        st.error(f"Error de conexión: {e}")
 
         except Exception as e:
-            st.error(f"Error al leer el archivo: {e}")
+            st.error(f"Error al procesar el archivo: {e}")
 
 if __name__ == "__main__":
     main()
